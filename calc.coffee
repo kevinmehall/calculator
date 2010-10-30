@@ -127,7 +127,7 @@ number = (c) -> new ConstantValue(c, {})
 
 class CalcObject
 	constructor: (@parent) ->
-		@tr = $('<tr><td><input /></td><td>=</td><td><input /></td><td>=></td><td></td></tr>')
+		@tr = $("<tr><td class='name'><input /></td><td>=</td><td><input /></td><td>=></td><td></td></tr>")
 		$(@tr).data('obj', this)
 		[@td_name, _, @td_value, _, @td_ans] = @tr.find('td')
 		@inp_name = $(@td_name).find('input')
