@@ -1,4 +1,4 @@
-editGrid = (table) ->
+editGrid = (table, outsideBoundFn) ->
 	$(table).find('input').live 'keydown', (e) ->
 		elem = this
 		
@@ -6,7 +6,14 @@ editGrid = (table) ->
 			if col<0 or row<0 then return
 			tr = $(table).children().eq(row)
 			input = $(tr).find('input').eq(col)
-			input.focus()
+			try
+				$(elem).change()
+			catch e
+				console.error(e)
+			if input.length
+				input.focus()
+			else
+				outsideBoundFn(elem, col, row)
 		
 		pos = ->
 			tr = $(elem).closest('tr')
@@ -18,12 +25,12 @@ editGrid = (table) ->
 		moveBy = (x, y, cursorPos) ->
 			[table,col,row] = pos()
 			moveTo(table, col+x, row+y, cursorPos)
-		
+
 		if event.which == 38 #up
 			moveBy(0, -1)
-		else if event.which == 40 #down
+		else if event.which == 40 or event.which == 13 #down, enter
 			moveBy(0, 1)
-		else if event.which == 39 and elem.selectionEnd == elem.value.length #right
+		else if (event.which == 39 or event.which == 187) and elem.selectionEnd == elem.value.length #right
 			moveBy(1, 0, -1)
 		else if event.which == 37 and elem.selectionStart == 0 #left
 			moveBy(-1, 0, 1)
@@ -147,6 +154,7 @@ class CalcObject
 		@recalc()
 		
 	recalc: ->
+		return if not @fn
 		try
 			get = (v) =>
 				o = @parent.vars[v]
@@ -159,7 +167,6 @@ class CalcObject
 					o.evaluate()
 			@value = @fn(get)
 			@value.setName(@name)
-			console.log('value', @value)
 			$(@td_ans).empty().append(@value.display())
 		catch e
 			@setError(e.message)
@@ -167,17 +174,35 @@ class CalcObject
 		try
 			@parent.updated(@name)
 		catch e
-			true
+			console.error(e)
 		
 		
 	setError: (e) ->
 		$(@td_ans).empty().append($("<span style='color:red'></span>").text(e))
 	
 	updateName: (name) ->
+		if not name
+			name = 'r1'
+		
+		return if name == @name
+		
+		if name of @parent.vars
+			countstr = /\d*$/.exec(name)[0]
+			if countstr
+				count = parseInt(countstr, 10) + 1
+			else
+				count = 1
+			console.log(count, countstr)
+			return @updateName(name.slice(0, name.length-countstr.length)+count)
+			
+		return if name == @name
+		
 		oldname = @name
 		@name = name
 		@value.name = name if @value
-		@parent.nameChanged(this, @name, name)
+		@inp_name.val(name)
+		@parent.nameChanged(this, oldname, name)
+		@recalc()
 		
 	evaluate: -> @value
 
@@ -189,17 +214,20 @@ class CalcObject
 		
 class Calc
 	constructor: (@table) ->
-		editGrid(@table)
+		editGrid @table, (elem, col, row) =>
+			console.log('offside', col, row)
+			if col > 1 #off the side
+				$(elem).change()
+			if row >= $(@table).find('tr').length #off the bottom
+				@newRow()
+				
 		@vars = {}
-		@final = false
-		@insertFinal()
+		@newRow()
 		
 	updated: (name) ->
 		for i of @vars
-			console.log(i, @vars[i].deps)
 			if @vars[i].deps and (name in @vars[i].deps)
 				@vars[i].recalc()
-		if name == @final.name then @insertFinal()
 		
 	nameChanged: (obj, oldname, newname) ->
 		if oldname
@@ -207,20 +235,17 @@ class Calc
 			try
 				@updated(oldname)
 			catch e
-				true
+				console.error(e)
 		if newname
 			@vars[newname] = obj
-			try
-				@updated(newname)
-			catch e
-				true
 		console.log('namechanged', newname, @vars)
-	
-	insertFinal: ->
+		
+	newRow: ->
 		final = new CalcObject(this)
-		final.updateName('r' + ($(@table).find('tr').length+1))
-		@table.append(final.render())
-		@final = final
+		e = final.render()
+		@table.append(e)
+		$(e).find('input').eq(0).focus()
+	
 		
 OPS = {'*':'multiply', '/':'divide', '+':'add', '-':'subtract', '^':'pow'}
 FNS = {
