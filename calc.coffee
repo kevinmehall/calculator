@@ -32,6 +32,69 @@ editGrid = (table) ->
 		return false
 		
 
+class CalcValue
+	
+combineUnits = (a, b) ->
+	out = {}
+	for u of a
+		out[u] = a[u]
+	for u of b
+		if not out[u]
+			out[u] = 0
+		out[u] += b[u]
+		if out[u] == 0
+			delete out[u]
+	return out
+	
+powUnits = (a, p) ->
+	out = {}
+	for u of a
+		out[u] = a*p
+	return out
+	
+checkUnitsEqual = (a, b) ->
+	for i, e of a
+		return false if b[i] != e
+	for i, e of b
+		return false if a[i] != e
+	return true
+	
+class ConstantValue extends CalcValue
+	constructor: (@value, @units, @name) ->
+	
+	display: ->
+		pos_units = []
+		pos_units = [Math.abs(@units[i]), i] for i in @units when @units[i] >= 0
+		neg_units = [Math.abs(@units[i]), i] for i in @units when @units[i] < 0
+		pos_units.sort(); neg_units.sort()
+		unitText = ' '+("#{i[i]}^#{i[0]}" for i in pos_units).join(' * ')
+		if neg_units.length
+			unitText += ' / ' + ("#{i[i]}^#{i[0]}" for i in neg_units).join(' / ')
+		$("<span class='value'></span>").text(@value).append(
+			$("<span class='units'></span>").text(unitText))
+			
+	multiply: (other) ->
+		new ConstantValue(@value*other.value, combineUnits(this.units, other.units))
+		
+	divide: (other) ->
+		new ConstantValue(@value/other.value, combineUnits(this, powUnits(other.units, -1)))
+	
+	add: (other) ->
+		checkUnitsEqual(this.units, other.units)
+		new ConstantValue(@value+other.value, @units)
+		
+	subtract: (other) ->
+		checkUnitsEqual(this.units, other.units)
+		new ConstantValue(@value-other.value, @units)
+		
+	pow: (other) ->
+		checkUnitsEqual(other.units, {})
+		new ConstantValue(Math.pow(@value, other.value), powUnits(this.units, other.value))
+		
+		
+
+number = (c) -> new ConstantValue(c, {})
+
 class CalcObject
 	constructor: (@parent) ->
 		@tr = $('<tr><td><input /></td><td>=</td><td><input /></td><td>=></td><td></td></tr>')
@@ -65,7 +128,9 @@ class CalcObject
 				else
 					o.evaluate()
 			@value = @fn(get)
-			$(@td_ans).text(@value)
+			@value.name = @name
+			console.log('value', @value)
+			$(@td_ans).empty().append(@value.display())
 		catch e
 			@setError(e.message)
 			throw e
@@ -79,9 +144,10 @@ class CalcObject
 		$(@td_ans).empty().append($("<span style='color:red'></span>").text(e))
 	
 	updateName: (name) ->
-		@parent.nameChanged(this, @name, name)
+		oldname = @name
 		@name = name
-		
+		@value.name = name if @value
+		@parent.nameChanged(this, @name, name)
 		
 	evaluate: -> @value
 
@@ -126,21 +192,19 @@ class Calc
 		@table.append(final.render())
 		@final = final
 		
-
+OPS = {'*':'multiply', '/':'divide', '+':'add', '-':'subtract', '^':'pow'}
 ast_compile = (exp) ->
 	deps = []
 	exp_to_js = (v) ->
 		switch v.arity
 			when 'literal', 'number'
-				""+v.value
+				"number(#{v.value})"
 			when 'name'
 				deps.push(v.value)
 				"get('#{v.value}')"
 			when 'binary'
-				if v.value == '^'
-					"Math.pow(#{exp_to_js(v.first)}, #{exp_to_js(v.second)})"
-				else
-					"(#{exp_to_js(v.first)} #{v.value} #{exp_to_js(v.second)})"
+					op = OPS[v.value]
+					"#{exp_to_js(v.first)}.#{op}(#{exp_to_js(v.second)})"
 			when 'function'
 				if fns[v.value]
 					"#{fns[v.value]}(#{exp_to_js(v.arg)})"
