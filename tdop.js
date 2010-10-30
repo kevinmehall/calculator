@@ -127,13 +127,17 @@ function make_parse(){
 	}
 	
 	symbol("(", 61).led = function(left){
-		var e = expression(0);
+		left.arity='function';
+		left.args =[];
+		if (token.id !== ')'){
+			while (true){
+				left.args.push(expression(0));
+				if (token.id !== ',') break;
+			}
+		}
 	    advance(")");
-		if (fns[left.value]){
-			left.arity='function';
-			left.arg=e;
-			return left;
-		}else error('not a function')
+		
+		return left;
 	}
 	
 	symbol(")");
@@ -160,18 +164,6 @@ function to_sexp(v){
 		return '('+v.value+' '+to_sexp(v.arg)+')';
 }
 
-fns = {
-	'sin':'Math.sin',
-	'cos':'Math.cos',
-	'tan':'Math.tan',
-	'round':'Math.round',
-	'sqrt':'Math.sqrt',
-	'abs':'Math.abs',
-	'ln':'Math.log',
-	'atan': 'Math.atan',
-	'acos': 'Math.acos',
-	'asin': 'Math.asin',
-}
 
 constants = {
 	'pi':'Math.PI',

@@ -48,8 +48,8 @@ combineUnits = (a, b) ->
 	
 powUnits = (a, p) ->
 	out = {}
-	for u of a
-		out[u] = a*p
+	for u,e of a
+		out[u] = e*p
 	return out
 	
 checkUnitsEqual = (a, b) ->
@@ -60,24 +60,37 @@ checkUnitsEqual = (a, b) ->
 	return true
 	
 class ConstantValue extends CalcValue
-	constructor: (@value, @units, @name) ->
+	constructor: (@value, @units) ->
+	
+	setName: (@name) ->
 	
 	display: ->
 		pos_units = []
-		pos_units = [Math.abs(@units[i]), i] for i in @units when @units[i] >= 0
-		neg_units = [Math.abs(@units[i]), i] for i in @units when @units[i] < 0
+		pos_units = ([Math.abs(e), i] for i,e of @units when e >= 0)
+		neg_units = ([Math.abs(e), i] for i,e of @units when e < 0)
+		console.info('units', pos_units, neg_units)
 		pos_units.sort(); neg_units.sort()
-		unitText = ' '+("#{i[i]}^#{i[0]}" for i in pos_units).join(' * ')
-		if neg_units.length
-			unitText += ' / ' + ("#{i[i]}^#{i[0]}" for i in neg_units).join(' / ')
-		$("<span class='value'></span>").text(@value).append(
-			$("<span class='units'></span>").text(unitText))
+		
+		units = $("<span class='units'></span>")
+		
+		for i in pos_units
+			units.append(' * ')
+			units.append(i[1])
+			if i[0] != 1
+				units.append($('<sup></sup>').text(i[0]))
+		for i in neg_units
+			units.append(' / ')
+			units.append(i[1])
+			if i[0] != 1
+				units.append($('<sup></sup>').text(i[0]))
+		
+		$("<span class='value'></span>").text(@value).append(units)
 			
 	multiply: (other) ->
 		new ConstantValue(@value*other.value, combineUnits(this.units, other.units))
 		
 	divide: (other) ->
-		new ConstantValue(@value/other.value, combineUnits(this, powUnits(other.units, -1)))
+		new ConstantValue(@value/other.value, combineUnits(this.units, powUnits(other.units, -1)))
 	
 	add: (other) ->
 		checkUnitsEqual(this.units, other.units)
@@ -90,6 +103,23 @@ class ConstantValue extends CalcValue
 	pow: (other) ->
 		checkUnitsEqual(other.units, {})
 		new ConstantValue(Math.pow(@value, other.value), powUnits(this.units, other.value))
+		
+	trig: (fn) ->
+		new ConstantValue(fn(@value), {}) #TODO: check units, degrees
+		
+	wrap: (fn) ->
+		new ConstantValue(fn(@value), @units)
+		
+class Unit extends ConstantValue
+	constructor: (@definition) ->
+		@value = 1
+		@setName('UnnamedUnit')
+		
+	setName: (@name) ->
+		@units = {}
+		@units[@name] = 1
+	
+	
 		
 		
 
@@ -128,7 +158,7 @@ class CalcObject
 				else
 					o.evaluate()
 			@value = @fn(get)
-			@value.name = @name
+			@value.setName(@name)
 			console.log('value', @value)
 			$(@td_ans).empty().append(@value.display())
 		catch e
@@ -193,6 +223,17 @@ class Calc
 		@final = final
 		
 OPS = {'*':'multiply', '/':'divide', '+':'add', '-':'subtract', '^':'pow'}
+FNS = {
+	sin: (x) -> x.trig(Math.sin)
+	cos: (x) -> x.trig(Math.cos)
+	tan: (x) -> x.trig(Math.tan)
+	round: (x) -> x.wrap(Math.round)
+	abs: (x) -> x.wrap(Math.abs),
+	sqrt: (x) -> x.sqrt()
+	ln: (x) -> x.ln(),
+	unit: (x) -> new Unit(x)
+}
+
 ast_compile = (exp) ->
 	deps = []
 	exp_to_js = (v) ->
@@ -206,8 +247,11 @@ ast_compile = (exp) ->
 					op = OPS[v.value]
 					"#{exp_to_js(v.first)}.#{op}(#{exp_to_js(v.second)})"
 			when 'function'
-				if fns[v.value]
-					"#{fns[v.value]}(#{exp_to_js(v.arg)})"
+				if FNS[v.value]
+					a = (exp_to_js(i) for i in v.args).join(',')
+					"FNS.#{v.value}(#{a})"
+				else
+					throw {message:"undefined function: #{v.value}"}
 			else
 				console.error('unknown', v.arity)
 	[exp_to_js(exp), deps]
