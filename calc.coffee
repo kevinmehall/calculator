@@ -118,17 +118,17 @@ class ConstantValue extends CalcValue
 		new ConstantValue(fn(@value), @units)
 		
 class Unit extends ConstantValue
-	constructor: (@definition) ->
+	constructor: (@definition, names) ->
 		@value = 1
-		@setName('UnnamedUnit')
+		@names = names
+		if names and names.length
+			@setName(names[0])
+		else
+			@setName('UnnamedUnit')
 		
 	setName: (@name) ->
 		@units = {}
 		@units[@name] = 1
-	
-	
-		
-		
 
 number = (c) -> new ConstantValue(c, {})
 
@@ -150,26 +150,29 @@ class CalcObject
 			@fn = fn
 		catch e
 			@setError(e.message)
-			throw e
+			console.error(e)
 		@recalc()
 		
 	recalc: ->
 		return if not @fn
 		try
 			get = (v) =>
-				o = @parent.vars[v]
+				o = @parent.getVar(v)
 				if not o
 					throw {message: "Undefined variable #{v}"}
-				if (v == @name) or (@name in o.deps)
-					console.log('failing', v, @name, o.deps)
+				if (v == @name) or (o.deps and (@name in o.deps))
 					throw {message:'Recursive dependency'}
 				else
-					o.evaluate()
+					if o.evaluate
+						o = o.evaluate()
+				return o
 			@value = @fn(get)
-			@value.setName(@name)
+			if not @value.name
+				@value.setName(@name)
 			$(@td_ans).empty().append(@value.display())
 		catch e
 			@setError(e.message)
+			console.error(e, e.stack)
 			throw e
 		try
 			@parent.updated(@name)
@@ -183,10 +186,13 @@ class CalcObject
 	updateName: (name) ->
 		if not name
 			name = 'r1'
+			
+		if name.charAt(0) <= '9'
+			name = 'r'+name
 		
 		return if name == @name
 		
-		if name of @parent.vars
+		if @parent.getVar(name)
 			countstr = /\d*$/.exec(name)[0]
 			if countstr
 				count = parseInt(countstr, 10) + 1
@@ -213,7 +219,7 @@ class CalcObject
 		
 		
 class Calc
-	constructor: (@table) ->
+	constructor: (@table, scopes) ->
 		editGrid @table, (elem, col, row) =>
 			console.log('offside', col, row)
 			if col > 1 #off the side
@@ -222,8 +228,18 @@ class Calc
 				@newRow()
 				
 		@vars = {}
+		@scopes = scopes ? []
 		@newRow()
 		
+	getVar: (v) ->
+		if v of @vars
+			return @vars[v]
+		else
+			for i in @scopes
+				if i[v]
+					return i[v]
+		return undefined
+					
 	updated: (name) ->
 		for i of @vars
 			if @vars[i].deps and (name in @vars[i].deps)
@@ -280,6 +296,23 @@ ast_compile = (exp) ->
 			else
 				console.error('unknown', v.arity)
 	[exp_to_js(exp), deps]
-		
+
+units = [
+	[false, ['meter', 'meters', 'm']],
+	[false, ['second', 'seconds', 's']],
+	[false, ['kilogram', 'kilograms', 'kg']],
+]
+
+unitscope = {}
+
+for i in units
+	p = false
+	if i[0]
+		p = unitscope[i[0]]
+	u = new Unit(p, i[1])
+	for name in i[1]
+		unitscope[name] = u
+
+
 $ ->
-	window.calc = new Calc($('#page'))				
+	window.calc = new Calc($('#page'), [unitscope])				
