@@ -148,40 +148,57 @@ class CalcObject
 			[js, @deps] = ast_compile(p)
 			eval("function fn(get){return #{js}}")
 			@fn = fn
+			@recalc()
 		catch e
 			@setError(e.message)
 			console.error(e)
-		@recalc()
+			throw e
+		
+	findRecursiveDeps: (chain) ->
+		throw "abort!" if chain and chain.length > 10
+		if chain and @name == chain[0]
+			s = chain.join(' -> ')
+			throw {message:"Recursive dependency: #{s}"}
+		chain ?= []
+		console.log('chain', chain)
+		for dep in @deps
+			if @parent.vars[dep]
+				console.log("dep", dep)
+				@parent.vars[dep].findRecursiveDeps(chain.concat([@name]))
+
 		
 	recalc: ->
 		return if not @fn
+		console.log("recalc", @name, @deps)
 		try
+			@findRecursiveDeps()
 			get = (v) =>
 				o = @parent.getVar(v)
 				if not o
 					throw {message: "Undefined variable #{v}"}
-				if (v == @name) or (o.deps and (@name in o.deps))
-					throw {message:'Recursive dependency'}
 				else
+					if o.isError
+						throw {message: "Secondary error from #{v}"}
 					if o.evaluate
 						o = o.evaluate()
 				return o
 			@value = @fn(get)
+			@isError = false
 			if not @value.name
 				@value.setName(@name)
 			$(@td_ans).empty().append(@value.display())
+			@parent.updated(@name)
 		catch e
 			@setError(e.message)
 			console.error(e, e.stack)
-			throw e
-		try
-			@parent.updated(@name)
-		catch e
-			console.error(e)
-		
+			return
+			
+			
 		
 	setError: (e) ->
+		@isError = e
 		$(@td_ans).empty().append($("<span style='color:red'></span>").text(e))
+		#@parent.updated(@name)
 	
 	updateName: (name) ->
 		if not name
@@ -198,7 +215,6 @@ class CalcObject
 				count = parseInt(countstr, 10) + 1
 			else
 				count = 1
-			console.log(count, countstr)
 			return @updateName(name.slice(0, name.length-countstr.length)+count)
 			
 		return if name == @name
