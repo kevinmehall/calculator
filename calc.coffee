@@ -1,45 +1,8 @@
-editGrid = (table, outsideBoundFn) ->
-	$(table).find('input').live 'keydown', (e) ->
-		elem = this
-		
-		moveTo = (table, col, row, cursorPos) ->
-			if col<0 or row<0 then return
-			tr = $(table).children().eq(row)
-			input = $(tr).find('input').eq(col)
-			try
-				$(elem).change()
-			catch e
-				console.error(e)
-			if input.length
-				input.focus()
-			else
-				outsideBoundFn(elem, col, row)
-		
-		pos = ->
-			tr = $(elem).closest('tr')
-			table = $(tr).parent()
-			row = $(table).children().index(tr)
-			col = $(tr).find('input').index(elem)
-			[table,col,row]
-			
-		moveBy = (x, y, cursorPos) ->
-			[table,col,row] = pos()
-			moveTo(table, col+x, row+y, cursorPos)
+exports = window
 
-		if event.which == 38 #up
-			moveBy(0, -1)
-		else if event.which == 40 or event.which == 13 #down, enter
-			moveBy(0, 1)
-		else if (event.which == 39 or event.which == 187 and not event.shiftKey) and elem.selectionEnd == elem.value.length #right
-			moveBy(1, 0, -1)
-		else if event.which == 37 and elem.selectionStart == 0 #left
-			moveBy(-1, 0, 1)
-		else
-			return true
-		return false
-		
-
-class CalcValue
+class CalcObject
+class CalcConstant extends CalcObject
+	state: 'constant'
 	
 combineUnits = (a, b) ->
 	out = {}
@@ -66,7 +29,7 @@ checkUnitsEqual = (a, b) ->
 		return false if a[i] != e
 	return true
 	
-class ConstantValue extends CalcValue
+class UnitValue extends CalcConstant
 	constructor: (@value, @units) ->
 	
 	setName: (@name) ->
@@ -94,30 +57,30 @@ class ConstantValue extends CalcValue
 		$("<span class='value'></span>").text(@value).append(units)
 			
 	multiply: (other) ->
-		new ConstantValue(@value*other.value, combineUnits(this.units, other.units))
+		new UnitValue(@value*other.value, combineUnits(this.units, other.units))
 		
 	divide: (other) ->
-		new ConstantValue(@value/other.value, combineUnits(this.units, powUnits(other.units, -1)))
+		new UnitValue(@value/other.value, combineUnits(this.units, powUnits(other.units, -1)))
 	
 	add: (other) ->
 		checkUnitsEqual(this.units, other.units)
-		new ConstantValue(@value+other.value, @units)
+		new UnitValue(@value+other.value, @units)
 		
 	subtract: (other) ->
 		checkUnitsEqual(this.units, other.units)
-		new ConstantValue(@value-other.value, @units)
+		new UnitValue(@value-other.value, @units)
 		
 	pow: (other) ->
 		checkUnitsEqual(other.units, {})
-		new ConstantValue(Math.pow(@value, other.value), powUnits(this.units, other.value))
+		new UnitValue(Math.pow(@value, other.value), powUnits(this.units, other.value))
 		
 	trig: (fn) ->
-		new ConstantValue(fn(@value), {}) #TODO: check units, degrees
+		new UnitValue(fn(@value), {}) #TODO: check units, degrees
 		
 	wrap: (fn) ->
-		new ConstantValue(fn(@value), @units)
+		new UnitValue(fn(@value), @units)
 		
-class Unit extends ConstantValue
+class Unit extends UnitValue
 	constructor: (@definition, names) ->
 		@value = 1
 		@names = names
@@ -130,153 +93,114 @@ class Unit extends ConstantValue
 		@units = {}
 		@units[@name] = 1
 
-number = (c) -> new ConstantValue(c, {})
+exports.number = number = (c) -> new UnitValue(c, {})
 
-class CalcObject
-	constructor: (@parent) ->
-		@tr = $("<tr><td class='name'><input /></td><td>=</td><td><input /></td><td>=></td><td></td></tr>")
-		$(@tr).data('obj', this)
-		[@td_name, _, @td_value, _, @td_ans] = @tr.find('td')
-		@inp_name = $(@td_name).find('input')
-		@inp_name.change => @updateName(@inp_name.val())
-		@inp_val = $(@td_value).find('input')
-		@inp_val.change => @update(@inp_val.val())
-	
-	update: (@value) ->
+exports.CalcExpression = class CalcExpression extends CalcObject
+	state: 'expression'
+	constructor: (exp) ->
 		try
-			p = parse(@value)
+			p = parse(exp)
 			[js, @deps] = ast_compile(p)
-			eval("function fn(get){return #{js}}")
+			console.log(js)
+			eval("function fn(vals){return #{js}}")
 			@fn = fn
-			@recalc()
 		catch e
-			@setError(e.message)
-			console.error(e)
-			throw e
-		
-	findRecursiveDeps: (chain) ->
-		throw "abort!" if chain and chain.length > 10
-		if chain and @name == chain[0]
-			s = chain.join(' -> ')
-			throw {message:"Recursive dependency: #{s}"}
-		chain ?= []
-		console.log('chain', chain)
-		for dep in @deps
-			if @parent.vars[dep]
-				console.log("dep", dep)
-				@parent.vars[dep].findRecursiveDeps(chain.concat([@name]))
-
-		
-	recalc: ->
-		return if not @fn
-		console.log("recalc", @name, @deps)
-		try
-			@findRecursiveDeps()
-			get = (v) =>
-				o = @parent.getVar(v)
-				if not o
-					throw {message: "Undefined variable #{v}"}
-				else
-					if o.isError
-						throw {message: "Secondary error from #{v}"}
-					if o.evaluate
-						o = o.evaluate()
-				return o
-			@value = @fn(get)
-			@isError = false
-			if not @value.name
-				@value.setName(@name)
-			$(@td_ans).empty().append(@value.display())
-			@parent.updated(@name)
-		catch e
-			@setError(e.message)
-			console.error(e, e.stack)
-			return
+			@parseError = new CalcError(e)
 			
+	evaluate: (context) ->
+		if @parseError
+			@parseError
+		else if not @fn
+			return new CalcError("Not compiled!")
+		else
+			vals = {}
+			for i in @deps
+				vals[i] = context.getVar(i)
+				if not vals[i]
+					return new CalcError("Undefined variable #{i}")
+				if vals[i].state is 'error'
+					return new CalcError("Previous error from #{i}")
+			@fn(vals)
 			
-		
-	setError: (e) ->
-		@isError = e
-		$(@td_ans).empty().append($("<span style='color:red'></span>").text(e))
-		#@parent.updated(@name)
+exports.CalcError = class CalcError extends CalcObject
+	state: 'error'
+	constructor: (@error) ->
 	
-	updateName: (name) ->
+	display: ->
+		e = if @error.message
+			@error.message
+		else 
+			@error
+		$("<span style='color:red'></span>").text(e)
+		
+exports.Context = class Context
+	constructor: (@scopes)->
+		@vars = {}
+		@cache = {}
+		
+	getVar: (v) ->
+		if not @cache[v]
+			val =  @vars[v]
+			if not val
+				for i in @scopes
+					return i[v] if i[v]
+				return false
+			if val.state is 'expression'
+				@cache[v] = new CalcError("recursive") # set it to error while running so it errors out instead of entering loop
+				val = @vars[v].evaluate(this)
+			@cache[v] = val
+		return @cache[v]
+		
+	varExists: (v) ->
+		if v of @vars
+			return true
+		else
+			for i in @scopes
+				return true if i[v]
+		return false
+		
+	setVar: (v, val) ->
+		@vars[v] = val
+		@update(v)
+		
+	renameVar: (n1, n2) ->
+		if n2
+			n2 = @uniquifyName(n2)
+			return if n1 is n2
+			@vars[n2] = @vars[n1]
+		del @vars[n1]
+		@update(n1)
+		if n2
+			@update(n2)
+			
+	uniquifyName: (name) ->
 		if not name
 			name = 'r1'
 			
 		if name.charAt(0) <= '9'
 			name = 'r'+name
 		
-		return if name == @name
-		
-		if @parent.getVar(name)
+		if @varExists(name)
 			countstr = /\d*$/.exec(name)[0]
 			if countstr
 				count = parseInt(countstr, 10) + 1
 			else
 				count = 1
-			return @updateName(name.slice(0, name.length-countstr.length)+count)
+			return @uniquifyName(name.slice(0, name.length-countstr.length)+count)
 			
-		return if name == @name
+		return name
 		
-		oldname = @name
-		@name = name
-		@value.name = name if @value
-		@inp_name.val(name)
-		@parent.nameChanged(this, oldname, name)
-		@recalc()
-		
-	evaluate: -> @value
+	update: (v, inside) ->
+		inside = inside ? []
+		inside.unshift(v)
 
-	render: ->
-		@inp_name.val(@name)
-		@inp_val.val(@value)
-		return @tr
-		
-		
-class Calc
-	constructor: (@table, scopes) ->
-		editGrid @table, (elem, col, row) =>
-			console.log('offside', col, row)
-			if col > 1 #off the side
-				$(elem).change()
-			if row >= $(@table).find('tr').length #off the bottom
-				@newRow()
-				
-		@vars = {}
-		@scopes = scopes ? []
-		@newRow()
-		
-	getVar: (v) ->
-		if v of @vars
-			return @vars[v]
-		else
-			for i in @scopes
-				if i[v]
-					return i[v]
-		return undefined
-					
-	updated: (name) ->
+		delete @cache[v]
+
 		for i of @vars
-			if @vars[i].deps and (name in @vars[i].deps)
-				@vars[i].recalc()
+			if @vars[i].deps and (@vars[i].deps.indexOf(v) != -1) and (inside.indexOf(i) == -1)
+				@update(i, inside)
 		
-	nameChanged: (obj, oldname, newname) ->
-		if oldname
-			delete @vars[oldname]
-			try
-				@updated(oldname)
-			catch e
-				console.error(e)
-		if newname
-			@vars[newname] = obj
-		console.log('namechanged', newname, @vars)
-		
-	newRow: ->
-		final = new CalcObject(this)
-		e = final.render()
-		@table.append(e)
-		$(e).find('input').eq(0).focus()
+
 	
 		
 OPS = {'*':'multiply', '/':'divide', '+':'add', '-':'subtract', '^':'pow'}
@@ -299,7 +223,7 @@ ast_compile = (exp) ->
 				"number(#{v.value})"
 			when 'name'
 				deps.push(v.value)
-				"get('#{v.value}')"
+				"vals['#{v.value}']"
 			when 'binary'
 					op = OPS[v.value]
 					"#{exp_to_js(v.first)}.#{op}(#{exp_to_js(v.second)})"
@@ -319,7 +243,7 @@ units = [
 	[false, ['kilogram', 'kilograms', 'kg']],
 ]
 
-unitscope = {}
+exports.unitscope = {}
 
 for i in units
 	p = false
@@ -328,7 +252,3 @@ for i in units
 	u = new Unit(p, i[1])
 	for name in i[1]
 		unitscope[name] = u
-
-
-$ ->
-	window.calc = new Calc($('#page'), [unitscope])				
