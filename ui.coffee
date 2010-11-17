@@ -61,9 +61,11 @@ class CalcViewRow
 		name = @parent.uniquifyName(name)
 		if @name
 			delete @parent.rows[@name]
-		@parent.rows[name] = this	
+		@parent.rows[name] = this
+		oldname = @name
 		@name = name
-		@parent.renameVar(@name, name)
+		@parent.renameVar(oldname, name)
+		
 	
 	changeExp: (exp) ->
 		if not @name
@@ -95,7 +97,8 @@ class CalcView extends Context
 		
 	update: (v, inside) ->
 		super(v, inside)
-		@rows[v].update()
+		r = @rows[v]
+		r.update() if r
 		
 
 $ ->

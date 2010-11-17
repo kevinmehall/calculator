@@ -166,10 +166,10 @@ exports.Context = class Context
 			n2 = @uniquifyName(n2)
 			return if n1 is n2
 			@vars[n2] = @vars[n1]
-		del @vars[n1]
-		@update(n1)
-		if n2
-			@update(n2)
+		delete @vars[n1]
+		@update(n1) if n1
+		@update(n2) if n2 and @vars[n2]
+			
 			
 	uniquifyName: (name) ->
 		if not name
@@ -192,6 +192,7 @@ exports.Context = class Context
 		inside = inside ? []
 		inside.unshift(v)
 
+		console.log 'updating', v
 		delete @cache[v]
 
 		for i of @vars
