@@ -42,9 +42,12 @@ function make_parse(){
 		return this;
 	};
 	
+	var jux_mult=function(left){
+		return {value:'*', arity:'binary', first:left, second:expression(60, this)}
+	}
 	
 	symbol("(name)", 58).nud = itself;
-	symbol("(name)").led = 
+	symbol("(name)").led = jux_mult;
 	
 	symbol("(literal)", 60).nud = itself;
 

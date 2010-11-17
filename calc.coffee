@@ -38,7 +38,6 @@ class UnitValue extends CalcConstant
 		pos_units = []
 		pos_units = ([Math.abs(e), i] for i,e of @units when e >= 0)
 		neg_units = ([Math.abs(e), i] for i,e of @units when e < 0)
-		console.info('units', pos_units, neg_units)
 		pos_units.sort(); neg_units.sort()
 		
 		units = $("<span class='units'></span>")
@@ -101,7 +100,6 @@ exports.CalcExpression = class CalcExpression extends CalcObject
 		try
 			p = parse(exp)
 			[js, @deps] = ast_compile(p)
-			console.log(js)
 			eval("function fn(vals){return #{js}}")
 			@fn = fn
 		catch e
