@@ -11,6 +11,7 @@ editGrid = (table, outsideBoundFn) ->
 				input.focus()
 			else
 				outsideBoundFn(elem, col, row)
+			return input
 		
 		pos = ->
 			tr = $(elem).closest('tr')
@@ -27,10 +28,20 @@ editGrid = (table, outsideBoundFn) ->
 			moveBy(0, -1)
 		else if event.which == 40 or event.which == 13 #down, enter
 			moveBy(0, 1)
-		else if (event.which == 39 or event.which == 187 and not event.shiftKey) and elem.selectionEnd == elem.value.length #right
+		else if event.which == 39 and elem.selectionEnd == elem.value.length #right
 			moveBy(1, 0, -1)
 		else if event.which == 37 and elem.selectionStart == 0 #left
 			moveBy(-1, 0, 1)
+		else if event.which == 187 and not event.shiftKey # equals
+			[table, col, row] = pos()
+			if col == 1
+				name = $(elem).val()
+				i = $(elem).closest('tr').find('input').eq(0)
+				if /^[a-zA-Z0-9]+$/.test(name) and not i.val()
+					i.val(name).change()
+					$(elem).val('')
+					return false
+			moveBy(1, 0, -1)
 		else
 			return true
 		return false
@@ -93,7 +104,7 @@ class CalcView extends Context
 	newRow: ->
 		row = new CalcViewRow(this)
 		$(@table).append(row.tr)
-		$(row.tr).find('input').eq(0).focus()
+		$(row.tr).find('input').eq(1).focus()
 		
 	update: (v, inside) ->
 		super(v, inside)

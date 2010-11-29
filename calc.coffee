@@ -88,7 +88,7 @@ class UnitValue extends CalcConstant
 			unit = new UnitValue(1, u1.units)
 			u2 = u2.divide(unit)
 			u2 = u2.normalize()
-			raise "Incompatible units" if not u2.isUnitless()
+			throw "Incompatible units" if not u2.isUnitless()
 			u2.units = u1.units
 			return [u1, u2]
 			
