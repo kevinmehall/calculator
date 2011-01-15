@@ -185,24 +185,40 @@ exports.CalcError = class CalcError extends CalcObject
 			@error
 		$("<span style='color:red'></span>").text(e)
 		
+exports.Linspace = class Linspace extends CalcObject
+	state: 'function'
+	constructor: (@top) ->
+	
+	display: ->
+		$("<span>Linspace</span>")
+	
+	evaluate: (context) ->
+		
+		
 exports.Context = class Context
 	constructor: (@scopes)->
 		@vars = {}
 		@cache = {}
 		
 	getVar: (v) ->
-		if not @cache[v]
+		if @vars[v]
+			return @vars[v]
+		else
+			for i in @scopes
+				return i[v] if i[v]
+			return false
+		
+	evaluate: (exp, cacheKey) ->
+		if not @cacheKey[v]
 			val =  @vars[v]
-			if not val
-				for i in @scopes
-					return i[v] if i[v]
-				return false
+			
 			if val.state is 'expression'
 				@cache[v] = new CalcError("recursive") # set it to error while running so it errors out instead of entering loop
 				val = @vars[v].evaluate(this)
 				val.setName(v)
 			@cache[v] = val
 		return @cache[v]
+		
 		
 	varExists: (v) ->
 		if v of @vars
@@ -267,6 +283,7 @@ FNS = {
 	sqrt: (x) -> x.sqrt()
 	ln: (x) -> x.ln(),
 	unit: (x) -> new Unit(x)
+	linspace: (x) -> new Linspace(x) # TODO: multiple args
 }
 
 ast_compile = (exp) ->
