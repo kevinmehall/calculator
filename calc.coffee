@@ -8,6 +8,7 @@ class CalcReactive extends CalcObject
 		super
 		@listeners = []
 		@cache = false
+		@invalidated = false
 	
 	addListener: (l) ->
 		console.log 'addListen', this, l
@@ -19,9 +20,14 @@ class CalcReactive extends CalcObject
 			@listeners.splice(i, 1)
 		
 	invalidateCache: ->
-		console.log('invalidating', this)
 		@cache = false
-		listener.invalidateCache() for listener in @listeners
+		if not @invalidated
+			console.log('invalidating', this, this.name)
+			@invalidated = true
+			listener.invalidateCache() for listener in @listeners
+			
+	setValid: ->
+		@invalidated = false
 		
 	get: -> @cache
 
@@ -30,6 +36,8 @@ class CalcConstant extends CalcObject
 	
 	addListener: ->
 		# ignore, because we'll never notify
+		
+	removeListener: ->
 		
 	get: -> this
 	
@@ -50,6 +58,7 @@ class CalcExpression extends CalcReactive
 	type: 'expression'
 			
 	get: ->
+		@setValid()
 		if not @cache
 			@cache = recursiveDepError # so it fails if accessed by evaluate()
 			@cache = @evaluate()
@@ -122,16 +131,25 @@ class CalcVarExpression extends CalcReactive
 		super
 		@value = false
 		@set(value) if value
+		@inside = false
 		
 	get: ->
+		@setValid()
+		return recursiveDepError if @inside
+	
+		@inside = true
 		v = @value.get()
+		@inside = false
+		
 		v.setName(@name)
 		return v
 		
 	set: (value) ->
+		if @value
+			@value.removeListener()
 		@value = value
-		@invalidateCache()
 		@value.addListener(this)
+		@invalidateCache()
 		
 		
 		

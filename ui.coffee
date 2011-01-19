@@ -62,25 +62,26 @@ class CalcViewRow
 		@inp_val.change =>
 			@changeExp(@inp_val.val())
 
-	update: ->
-		@inp_name.val(@name)
+	update: =>
+		console.log('updating', @var.name)
 		$(@td_ans).empty().append(@var.get().display())
 
 	changeName: (name) ->
-		if name is @var.name then return
+		if not name or name is @var.name then return
 		name = @parent.uniquifyName(name)
+		console.log 'changing name', name, @inp_name
 		@var.name = name
 		@inp_name.val(name)
 		@parent.vars[name] = @var
 			
 	changeExp: (exp) ->
-		if not @name
+		if not @var.name
 			@changeName('r1')
 		p = parse(exp)
 		@var.set(expression(p, @parent))
 		
 	invalidateCache: ->
-		@update()
+		setTimeout(@update, 10)
 
 class CalcView extends Context
 	constructor: (@table, scopes) ->
