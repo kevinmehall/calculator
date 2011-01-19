@@ -49,8 +49,8 @@ editGrid = (table, outsideBoundFn) ->
 		
 class CalcViewRow
 	constructor: (@parent) ->
-		@value = false
-		@name = false
+		@var = new CalcVarExpression()
+		@var.addListener(this)
 		
 		@tr = $("<tr><td class='name'><input /></td><td>=</td><td><input /></td><td>=></td><td></td></tr>")
 		
@@ -64,27 +64,23 @@ class CalcViewRow
 
 	update: ->
 		@inp_name.val(@name)
-		#@inp_val.val(@value)
-		$(@td_ans).empty().append(@parent.getVar(@name).display())
+		$(@td_ans).empty().append(@var.get().display())
 
 	changeName: (name) ->
-		if name is @name then return
+		if name is @var.name then return
 		name = @parent.uniquifyName(name)
-		if @name
-			delete @parent.rows[@name]
-		@parent.rows[name] = this
-		oldname = @name
-		@name = name
-		@parent.renameVar(oldname, name)
-		
-	
+		@var.name = name
+		@inp_name.val(name)
+		@parent.vars[name] = @var
+			
 	changeExp: (exp) ->
 		if not @name
-			@name = @parent.uniquifyName('r1')
-			@parent.rows[@name] = this
-		@value = new CalcExpression(exp)
-		@parent.setVar(@name, @value)
-
+			@changeName('r1')
+		p = parse(exp)
+		@var.set(expression(p, @parent))
+		
+	invalidateCache: ->
+		@update()
 
 class CalcView extends Context
 	constructor: (@table, scopes) ->
@@ -96,7 +92,6 @@ class CalcView extends Context
 			if row >= $(@table).find('tr').length #off the bottom
 				@newRow()
 				
-		@vars = {}
 		@rows = {}
 		@scopes = scopes ? []
 		@newRow()
@@ -104,13 +99,7 @@ class CalcView extends Context
 	newRow: ->
 		row = new CalcViewRow(this)
 		$(@table).append(row.tr)
-		$(row.tr).find('input').eq(1).focus()
-		
-	update: (v, inside) ->
-		super(v, inside)
-		r = @rows[v]
-		r.update() if r
-		
+		$(row.tr).find('input').eq(1).focus()	
 
 $ ->
 	window.calc = new CalcView($('#page'), [unitscope])

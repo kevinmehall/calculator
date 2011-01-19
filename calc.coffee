@@ -1,182 +1,41 @@
 exports = window
 
 class CalcObject
-	setName: (@name) ->
+		setName: (@name) ->
+
+class CalcReactive extends CalcObject
+	constructor: ->
+		super
+		@listeners = []
+		@cache = false
+	
+	addListener: (l) ->
+		console.log 'addListen', this, l
+		@listeners.push(l)
+		
+	removeListener: (l) ->
+		i = @listeners.indexOf(l)
+		if i != -1
+			@listeners.splice(i, 1)
+		
+	invalidateCache: ->
+		console.log('invalidating', this)
+		@cache = false
+		listener.invalidateCache() for listener in @listeners
+		
+	get: -> @cache
 
 class CalcConstant extends CalcObject
-	state: 'constant'
+	type: 'constant'
 	
-combineUnits = (a, b) ->
-	out = {}
-	for u of a
-		out[u] = a[u]
-	for u of b
-		if not out[u]
-			out[u] = 0
-		out[u] += b[u]
-		if out[u] == 0
-			delete out[u]
-	return out
+	addListener: ->
+		# ignore, because we'll never notify
+		
+	get: -> this
 	
-powUnits = (a, p) ->
-	out = {}
-	for u,e of a
-		out[u] = e*p
-	return out
-	
-checkUnitsEqual = (a, b) ->
-	for i, e of a
-		return false if b[i] != e
-	for i, e of b
-		return false if a[i] != e
-	return true
-	
-getUnit = (name) ->
-	# TODO: don't use global
-	calc.getVar(name)
-	
-copy = (obj) ->
-	o = {}
-	for i of obj
-		o[i] = obj[i]
-	return o
-	
-class UnitValue extends CalcConstant
-	constructor: (@value, @units) ->
-	
-	display: ->
-		pos_units = []
-		pos_units = ([Math.abs(e), i] for i,e of @units when e >= 0)
-		neg_units = ([Math.abs(e), i] for i,e of @units when e < 0)
-		pos_units.sort(); neg_units.sort()
-		
-		units = $("<span class='units'></span>")
-		
-		for i in pos_units
-			units.append(' * ')
-			units.append(i[1])
-			if i[0] != 1
-				units.append($('<sup></sup>').text(i[0]))
-		for i in neg_units
-			units.append(' / ')
-			units.append(i[1])
-			if i[0] != 1
-				units.append($('<sup></sup>').text(i[0]))
-		
-		$("<span class='value'></span>").text(@value).append(units)
-		
-	numUnits: ->
-		count = 0
-		count++ for i of @units
-		return count
-		
-	isUnitless: ->  @numUnits() == 0
-		
-	maxDepth: ->
-		Math.max.apply(undefined, [0] + (Math.abs(@units[i]) for i of @units))
-		
-	matchUnits: (other) ->
-		# return pair of this and other converted to the same unit
-		
-		if this.units == other.units
-			return [this, other]
-		else
-			u1 = this
-			u2 = other
-			
-			u1 = u1.normalize()
-			unit = new UnitValue(1, u1.units)
-			u2 = u2.divide(unit)
-			u2 = u2.normalize()
-			throw "Incompatible units" if not u2.isUnitless()
-			u2.units = u1.units
-			return [u1, u2]
-			
-	replaceUnit: (unitName, value) ->
-		res = this.multiply(new UnitValue(Math.pow(value.value, @units[unitName]), powUnits(value.units, @units[unitName])))
-		delete res.units[unitName]
-		return res
-		
-	toBaseUnits: ->
-		out = this
-		for i of @units
-			u = getUnit(i) #TODO
-			if u.definition
-				out = out.replaceUnit(i, u.definition)
-		return out
-		
-	normalize: ->
-		@toBaseUnits()
-			
-	multiply: (other) ->
-		new UnitValue(@value*other.value, combineUnits(this.units, other.units))
-		
-	divide: (other) ->
-		new UnitValue(@value/other.value, combineUnits(this.units, powUnits(other.units, -1)))
-	
-	add: (other) ->
-		[a,b] = @matchUnits(other)
-		new UnitValue(a.value+b.value, a.units)
-		
-	subtract: (other) ->
-		[a,b] = @matchUnits(other)
-		new UnitValue(a.value+b.value, b.units)
-		
-	pow: (other) ->
-		checkUnitsEqual(other.units, {})
-		new UnitValue(Math.pow(@value, other.value), powUnits(this.units, other.value))
-		
-	trig: (fn) ->
-		new UnitValue(fn(@value), {}) #TODO: check units, degrees
-		
-	wrap: (fn) ->
-		new UnitValue(fn(@value), @units)
-		
-class Unit extends UnitValue
-	constructor: (definition, names) ->
-		@value = 1
-		@definition = definition.toBaseUnits() if definition
-		@names = names
-		if names and names.length
-			@setName(names[0])
-		else
-			@setName('UnnamedUnit')
-		
-	setName: (@name) ->
-		@units = {}
-		@units[@name] = 1
-
-exports.number = number = (c) -> new UnitValue(c, {})
-
-exports.CalcExpression = class CalcExpression extends CalcObject
-	state: 'expression'
-	constructor: (exp) ->
-		try
-			p = parse(exp)
-			[js, @deps] = ast_compile(p)
-			eval("function fn(vals){return #{js}}")
-			@fn = fn
-		catch e
-			@parseError = new CalcError(e)
-			
-	evaluate: (context) ->
-		if @parseError
-			@parseError
-		else if not @fn
-			return new CalcError("Not compiled!")
-		else
-			vals = {}
-			for i in @deps
-				vals[i] = context.getVar(i)
-				if not vals[i]
-					return new CalcError("Undefined variable #{i}")
-				if vals[i].state is 'error'
-					return new CalcError("Previous error from #{i}")
-			@fn(vals)
-			
-exports.CalcError = class CalcError extends CalcObject
-	state: 'error'
-	constructor: (@error) ->
+exports.CalcError = class CalcError extends CalcConstant
+	type: 'error'
+	constructor: (@error) -> super
 	
 	display: ->
 		e = if @error.message
@@ -184,63 +43,111 @@ exports.CalcError = class CalcError extends CalcObject
 		else 
 			@error
 		$("<span style='color:red'></span>").text(e)
+
+recursiveDepError = new CalcError("Recursive dependency")
+
+class CalcExpression extends CalcReactive
+	type: 'expression'
+			
+	get: ->
+		if not @cache
+			@cache = recursiveDepError # so it fails if accessed by evaluate()
+			@cache = @evaluate()
+		return super()
 		
-exports.Linspace = class Linspace extends CalcObject
-	state: 'function'
-	constructor: (@top) ->
 	
-	display: ->
-		$("<span>Linspace</span>")
-	
-	evaluate: (context) ->
+fnToExpressionClass = (fn) ->
+	(args) ->
+		cl = new CalcExpression()
+		cl.args = args
+		
+		for i in args
+			i.addListener(cl)
+	 	
+		cl.evaluate = ->
+			evaluatedArgs = []
+			for a in @args
+				v = a.get()
+				if v.type == 'error'
+					return v
+				evaluatedArgs.push(v)
+			fn.apply(this, evaluatedArgs)
+		
+		return cl
+
+		
+OPS = 
+	'*': fnToExpressionClass((a, b) -> a.multiply(b))
+	'/': fnToExpressionClass((a, b) -> a.divide(b))
+	'+': fnToExpressionClass((a, b) -> a.add(b))
+	'-': fnToExpressionClass((a, b) -> a.subtract(b))
+	'^': fnToExpressionClass((a, b) -> a.pow(b))
+
+FNS = {
+	sin: fnToExpressionClass (x) -> x.trig(Math.sin)
+	cos: fnToExpressionClass (x) -> x.trig(Math.cos)
+	tan: fnToExpressionClass (x) -> x.trig(Math.tan)
+	round: fnToExpressionClass (x) -> x.wrap(Math.round)
+	abs: fnToExpressionClass (x) -> x.wrap(Math.abs)
+	sqrt: fnToExpressionClass (x) -> x.sqrt()
+	ln: fnToExpressionClass (x) -> x.ln()
+	unit: fnToExpressionClass (x) -> new Unit(x)
+}
+
+
+expression = (v, context) ->
+	switch v.arity
+		when 'literal', 'number'
+			number(v.value)
+		when 'name'
+			context.getVarExpression(v.value)
+		when 'binary'
+			op = OPS[v.value]
+			new op([expression(v.first, context), expression(v.second, context)])
+		when 'function'
+			if FNS[v.value]
+				a = (expression(i, context) for i in v.args)
+				new FNS[v.value](a)
+			else
+				new CalcError("Undefined function #{v.value}")
+		else
+			console.error('unknown', v.arity)
+			new CalcError('unknown AST node')
+
+
+		
+class CalcVarExpression extends CalcReactive
+	type: 'var'
+	constructor: (@name, value) ->
+		super
+		@value = false
+		@set(value) if value
+		
+	get: ->
+		v = @value.get()
+		v.setName(@name)
+		return v
+		
+	set: (value) ->
+		@value = value
+		@invalidateCache()
+		@value.addListener(this)
+		
 		
 		
 exports.Context = class Context
 	constructor: (@scopes)->
 		@vars = {}
-		@cache = {}
-		
-	getVar: (v) ->
-		if @vars[v]
-			return @vars[v]
-		else
-			for i in @scopes
-				return i[v] if i[v]
-			return false
-		
-	evaluate: (exp, cacheKey) ->
-		if not @cacheKey[v]
-			val =  @vars[v]
-			
-			if val.state is 'expression'
-				@cache[v] = new CalcError("recursive") # set it to error while running so it errors out instead of entering loop
-				val = @vars[v].evaluate(this)
-				val.setName(v)
-			@cache[v] = val
-		return @cache[v]
-		
-		
-	varExists: (v) ->
-		if v of @vars
-			return true
-		else
-			for i in @scopes
-				return true if i[v]
-		return false
-		
-	setVar: (v, val) ->
-		@vars[v] = val
-		@update(v)
-		
+
 	renameVar: (n1, n2) ->
 		if n2
 			n2 = @uniquifyName(n2)
 			return if n1 is n2
 			@vars[n2] = @vars[n1]
 		delete @vars[n1]
-		@update(n1) if n1
-		@update(n2) if n2 and @vars[n2]
 			
+	varExists: (v) -> 
+		return @vars[v]
 			
 	uniquifyName: (name) ->
 		if not name
@@ -259,67 +166,8 @@ exports.Context = class Context
 			
 		return name
 		
-	update: (v, inside) ->
-		inside = inside ? []
-		inside.unshift(v)
-
-		console.log 'updating', v
-		delete @cache[v]
-
-		for i of @vars
-			if @vars[i].deps and (@vars[i].deps.indexOf(v) != -1) and (inside.indexOf(i) == -1)
-				@update(i, inside)
-		
-
-	
-		
-OPS = {'*':'multiply', '/':'divide', '+':'add', '-':'subtract', '^':'pow'}
-FNS = {
-	sin: (x) -> x.trig(Math.sin)
-	cos: (x) -> x.trig(Math.cos)
-	tan: (x) -> x.trig(Math.tan)
-	round: (x) -> x.wrap(Math.round)
-	abs: (x) -> x.wrap(Math.abs),
-	sqrt: (x) -> x.sqrt()
-	ln: (x) -> x.ln(),
-	unit: (x) -> new Unit(x)
-	linspace: (x) -> new Linspace(x) # TODO: multiple args
-}
-
-ast_compile = (exp) ->
-	deps = []
-	exp_to_js = (v) ->
-		switch v.arity
-			when 'literal', 'number'
-				"number(#{v.value})"
-			when 'name'
-				deps.push(v.value)
-				"vals['#{v.value}']"
-			when 'binary'
-					op = OPS[v.value]
-					"#{exp_to_js(v.first)}.#{op}(#{exp_to_js(v.second)})"
-			when 'function'
-				if FNS[v.value]
-					a = (exp_to_js(i) for i in v.args).join(',')
-					"FNS.#{v.value}(#{a})"
-				else
-					throw {message:"undefined function: #{v.value}"}
-			else
-				console.error('unknown', v.arity)
-	[exp_to_js(exp), deps]
-
-units = [
-	[false, ['meter', 'meters', 'm']],
-	[false, ['second', 'seconds', 's']],
-	[false, ['kilogram', 'kilograms', 'kg']],
-]
-
-exports.unitscope = {}
-
-for i in units
-	p = false
-	if i[0]
-		p = unitscope[i[0]]
-	u = new Unit(p, i[1])
-	for name in i[1]
-		unitscope[name] = u
+	getVarExpression: (v) -> 
+		if @vars[v]
+			@vars[v] 
+		else
+			new CalcError("Undefined variable #{v}")
