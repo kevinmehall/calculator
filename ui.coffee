@@ -38,8 +38,8 @@ editGrid = (table, outsideBoundFn) ->
 				name = $(elem).val()
 				i = $(elem).closest('tr').find('input').eq(0)
 				if /^[a-zA-Z0-9]+$/.test(name) and not i.val()
-					i.val(name).change()
 					$(elem).val('')
+					i.val(name).change()
 					return false
 			moveBy(1, 0, -1)
 		else
@@ -52,7 +52,7 @@ class CalcViewRow
 		@var = new CalcVarExpression()
 		@var.addListener(this)
 		
-		@tr = $("<tr><td class='name'><input /></td><td>=</td><td><input /></td><td>=></td><td></td></tr>")
+		@tr = $("<tr><td class='name'><input /></td><td class='eq'>=</td><td><input /></td><td class='ans_arr'>&rarr;</td><td></td></tr>")
 		
 		[@td_name, _, @td_value, _, @td_ans] = @tr.find('td')
 		@inp_name = $(@td_name).find('input')
@@ -63,13 +63,11 @@ class CalcViewRow
 			@changeExp(@inp_val.val())
 
 	update: =>
-		console.log('updating', @var.name)
 		$(@td_ans).empty().append(@var.get().display())
 
 	changeName: (name) ->
 		if not name or name is @var.name then return
 		name = @parent.uniquifyName(name)
-		console.log 'changing name', name, @inp_name
 		@var.name = name
 		@inp_name.val(name)
 		@parent.vars[name] = @var
@@ -87,7 +85,6 @@ class CalcView extends Context
 	constructor: (@table, scopes) ->
 		super(scopes)
 		editGrid @table, (elem, col, row) =>
-			console.log('offside', col, row)
 			if col > 1 #off the side
 				$(elem).change()
 			if row >= $(@table).find('tr').length #off the bottom

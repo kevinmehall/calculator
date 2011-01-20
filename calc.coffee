@@ -11,7 +11,6 @@ class CalcReactive extends CalcObject
 		@invalidated = false
 	
 	addListener: (l) ->
-		console.log 'addListen', this, l
 		@listeners.push(l)
 		
 	removeListener: (l) ->
@@ -22,7 +21,6 @@ class CalcReactive extends CalcObject
 	invalidateCache: ->
 		@cache = false
 		if not @invalidated
-			console.log('invalidating', this, this.name)
 			@invalidated = true
 			listener.invalidateCache() for listener in @listeners
 			
@@ -78,7 +76,10 @@ fnToExpressionClass = (fn) ->
 			for a in @args
 				v = a.get()
 				if v.type == 'error'
-					return v
+					if v.name
+						return new CalcError("Previous error from '#{a.name}'")
+					else
+						return v
 				evaluatedArgs.push(v)
 			fn.apply(this, evaluatedArgs)
 		
@@ -109,7 +110,7 @@ expression = (v, context) ->
 		when 'literal', 'number'
 			number(v.value)
 		when 'name'
-			context.getVarExpression(v.value)
+			context.getVar(v.value)
 		when 'binary'
 			op = OPS[v.value]
 			new op([expression(v.first, context), expression(v.second, context)])
@@ -118,7 +119,7 @@ expression = (v, context) ->
 				a = (expression(i, context) for i in v.args)
 				new FNS[v.value](a)
 			else
-				new CalcError("Undefined function #{v.value}")
+				new CalcError("Undefined function '#{v.value}'")
 		else
 			console.error('unknown', v.arity)
 			new CalcError('unknown AST node')
@@ -165,7 +166,9 @@ exports.Context = class Context
 		delete @vars[n1]
 			
 	varExists: (v) -> 
-		return @vars[v]
+		return true if @vars[v]
+		for scope in @scopes
+			return true if scope[v]
 			
 	uniquifyName: (name) ->
 		if not name
@@ -184,8 +187,8 @@ exports.Context = class Context
 			
 		return name
 		
-	getVarExpression: (v) -> 
-		if @vars[v]
-			@vars[v] 
-		else
-			new CalcError("Undefined variable #{v}")
+	getVar: (v) -> 
+		return @vars[v] if @vars[v]
+		for scope in @scopes
+			return scope[v] if scope[v]
+		new CalcError("Undefined variable '#{v}'")
