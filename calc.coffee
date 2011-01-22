@@ -81,7 +81,10 @@ fnToExpressionClass = (fn) ->
 					else
 						return v
 				evaluatedArgs.push(v)
-			fn.apply(this, evaluatedArgs)
+			try
+				fn.apply(this, evaluatedArgs)
+			catch e
+				return new CalcError(e.message ? e)
 		
 		return cl
 
