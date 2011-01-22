@@ -108,24 +108,32 @@ FNS = {
 }
 
 
-expression = (v, context) ->
-	switch v.arity
-		when 'literal', 'number'
-			number(v.value)
-		when 'name'
-			context.getVar(v.value)
-		when 'binary'
-			op = OPS[v.value]
-			new op([expression(v.first, context), expression(v.second, context)])
-		when 'function'
-			if FNS[v.value]
-				a = (expression(i, context) for i in v.args)
-				new FNS[v.value](a)
+compileExpression = (exp, context) ->
+	expression = (v) ->
+		switch v.arity
+			when 'literal', 'number'
+				number(v.value)
+			when 'name'
+				context.getVar(v.value)
+			when 'binary'
+				op = OPS[v.value]
+				new op([expression(v.first, context), expression(v.second, context)])
+			when 'function'
+				if FNS[v.value]
+					a = (expression(i, context) for i in v.args)
+					new FNS[v.value](a)
+				else
+					new CalcError("Undefined function '#{v.value}'")
 			else
-				new CalcError("Undefined function '#{v.value}'")
-		else
-			console.error('unknown', v.arity)
-			new CalcError('unknown AST node')
+				console.error('unknown', v.arity)
+				new CalcError('unknown AST node')
+		
+	try
+		p = parse(exp)
+	catch e
+		return new CalcError(e.message ? e)
+	
+	return expression(p)
 
 
 		

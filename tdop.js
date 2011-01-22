@@ -12,10 +12,10 @@ function make_parse(){
 
 	var original_symbol = {
 	    nud: function () {
-	        error("Undefined.", this);
+	        error("Incomplete Expression", this);
 	    },
 	    led: function (left) {
-	        error("Missing operator.", this);
+	        error("Missing operator", this);
 	    }
 	};
 

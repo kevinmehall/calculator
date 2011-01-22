@@ -75,8 +75,7 @@ class CalcViewRow
 	changeExp: (exp) ->
 		if not @var.name
 			@changeName('r1')
-		p = parse(exp)
-		@var.set(expression(p, @parent))
+		@var.set(compileExpression(exp, @parent))
 		
 	invalidateCache: ->
 		setTimeout(@update, 10)
