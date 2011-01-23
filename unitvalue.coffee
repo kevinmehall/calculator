@@ -1,72 +1,64 @@
 	
+eachUnitPair = (alist, blist, fn) ->
+	ai = bi = 0
+	r = []
+	while ai < alist.length or bi < blist.length
+		a = alist[ai]
+		b = blist[bi]
+		if not b or (a and a[0].name < b[0].name)
+			r.push fn(a[0], a[1], 0)
+			ai += 1
+		else if a and b and a[0] is b[0]
+			r.push fn(a[0],  a[1], b[1])
+			ai += 1
+			bi += 1
+		else if not a or (b and a[0].name > b[0].name)
+			r.push fn(b[0], 0, b[1])
+			bi += 1
+			
+	return r
+		
 combineUnits = (a, b) ->
-	out = {}
-	for u of a
-		out[u] = a[u]
-	for u of b
-		if not out[u]
-			out[u] = 0
-		out[u] += b[u]
-		if out[u] == 0
-			delete out[u]
+	out = []
+	eachUnitPair a, b, (unit, ac, bc) -> if ac+bc then out.push [unit, ac+bc]
 	return out
 	
 powUnits = (a, p) ->
-	out = {}
-	for u,e of a
-		out[u] = e*p
-	return out
+	([u, c*p] for [u,c] in a)
 	
 checkUnitsEqual = (a, b) ->
-	for i, e of a
-		return false if b[i] != e
-	for i, e of b
-		return false if a[i] != e
-	return true
-	
-getUnit = (name) ->
-	# TODO: don't use global
-	calc.getVar(name)
-	
-copy = (obj) ->
-	o = {}
-	for i of obj
-		o[i] = obj[i]
-	return o
+	Math.min.apply(undefined, eachUnitPair a, b, (unit, ac, ab) -> ac==ab) == 1
 	
 class UnitValue extends CalcConstant
 	constructor: (@value, @units) ->
 	
 	display: ->
 		pos_units = []
-		pos_units = ([Math.abs(e), i] for i,e of @units when e >= 0)
-		neg_units = ([Math.abs(e), i] for i,e of @units when e < 0)
+		pos_units = ([Math.abs(e), i] for [i,e] in @units when e >= 0)
+		neg_units = ([Math.abs(e), i] for [i,e] in @units when e < 0)
 		pos_units.sort(); neg_units.sort()
 		
 		units = $("<span class='units'></span>")
 		
 		for i in pos_units
 			units.append(' * ')
-			units.append(i[1])
+			units.append(i[1].name)
 			if i[0] != 1
 				units.append($('<sup></sup>').text(i[0]))
 		for i in neg_units
 			units.append(' / ')
-			units.append(i[1])
+			units.append(i[1].name)
 			if i[0] != 1
 				units.append($('<sup></sup>').text(i[0]))
 		
 		$("<span class='value'></span>").text(@value).append(units)
 		
-	numUnits: ->
-		count = 0
-		count++ for i of @units
-		return count
+	numUnits: -> @units.length
 		
 	isUnitless: ->  @numUnits() == 0
 		
 	maxDepth: ->
-		Math.max.apply(undefined, [0] + (Math.abs(@units[i]) for i of @units))
+		Math.max.apply(undefined, [0] + (Math.abs(exponent) for [unit, exponent] in @units))
 		
 	matchUnits: (other) ->
 		# return pair of this and other converted to the same unit
@@ -85,17 +77,14 @@ class UnitValue extends CalcConstant
 			u2.units = u1.units
 			return [u1, u2]
 			
-	replaceUnit: (unitName, value) ->
-		res = this.multiply(new UnitValue(Math.pow(value.value, @units[unitName]), powUnits(value.units, @units[unitName])))
-		delete res.units[unitName]
-		return res
+	replaceUnit: (match, replacement) ->
+		([(if u is match then replacement else u), count] for  [u, count] in @units)
 		
 	toBaseUnits: ->
 		out = this
-		for i of @units
-			u = getUnit(i) #TODO
+		for [u, count] in @units
 			if u.definition
-				out = out.replaceUnit(i, u.definition)
+				out = out.replaceUnit(u, u.definition)
 		return out
 		
 	normalize: ->
@@ -116,44 +105,41 @@ class UnitValue extends CalcConstant
 		new UnitValue(a.value+b.value, b.units)
 		
 	pow: (other) ->
-		checkUnitsEqual(other.units, {})
-		new UnitValue(Math.pow(@value, other.value), powUnits(this.units, other.value))
+		if not other.isUnitless()
+			return new CalcError("Exponent must be unitless")
+		else
+			return @powJS(other.value)
+			
+	powJS: (pow) -> 
+		new UnitValue(Math.pow(@value, pow), powUnits(this.units, pow))
 		
 	trig: (fn) ->
-		new UnitValue(fn(@value), {}) #TODO: check units, degrees
+		new UnitValue(fn(@value), []) #TODO: check units, degrees
 		
 	wrap: (fn) ->
 		new UnitValue(fn(@value), @units)
 		
 class Unit extends UnitValue
-	constructor: (definition, names) ->
+	constructor: (definition, name) ->
 		@value = 1
 		@definition = definition.toBaseUnits() if definition
-		@names = names
-		if names and names.length
-			@setName(names[0])
-		else
-			@setName('UnnamedUnit')
+		@name = name ? 'UnnamedUnit'
+		@units = [[this,1]]
 		
-	setName: (@name) ->
-		@units = {}
-		@units[@name] = 1
+	setName: (name) ->
+		if not @name
+			@nam e= name
 
-exports.number = number = (c) -> new UnitValue(c, {})
+exports.number = number = (c) -> new UnitValue(c, [])
 
 
-units = [
-	[false, ['meter', 'meters', 'm']],
-	[false, ['second', 'seconds', 's']],
-	[false, ['kilogram', 'kilograms', 'kg']],
-]
+$ ->
+	u = exports.unitscope = {}
+	u.m = u.meters = u.meter = new Unit(null, 'meters')
+	u.s = u.seconds = u.second = new Unit(null, 'seconds')
+	u.kg = u.kilograms = u.kilograms = new Unit(null, 'kilograms')
+	u.N = u.newtons = u.newton = new Unit(u.kg.multiply(u.m.divide(u.s.powJS(2))), 'N')
+	u.J = u.joules = u.joule = new Unit(u.N.multiply(u.m), 'J')
 
-exports.unitscope = {}
 
-for i in units
-	p = false
-	if i[0]
-		p = unitscope[i[0]]
-	u = new Unit(p, i[1])
-	for name in i[1]
-		unitscope[name] = u
+
