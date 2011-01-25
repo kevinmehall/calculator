@@ -146,7 +146,7 @@ function make_parse(){
 	symbol(")");
 
 	symbol("-").nud = function () {
-		return {value:'-', arity:'binary', first:{value:0, arity:'literal'}, second:expression(65)}
+		return {value:'*', arity:'binary', first:{value:-1, arity:'literal'}, second:expression(65)}
 	}
 	
     return function (source) {
@@ -165,12 +165,6 @@ function to_sexp(v){
 		return '('+v.value+' '+to_sexp(v.first)+' '+to_sexp(v.second)+')';
 	else if (v.arity=='function')
 		return '('+v.value+' '+to_sexp(v.arg)+')';
-}
-
-
-constants = {
-	'pi':'Math.PI',
-	'e':'Math.E',
 }
 
 parse = make_parse()

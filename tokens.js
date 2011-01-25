@@ -112,9 +112,7 @@ String.prototype.tokens = function (spliton) {
                 if (c === '-' || c === '+') {
                     i += 1;
                     str += c;
-                }
-                if (c < '0' || c > '9') {
-                    error("Bad exponent", make('number', str));
+                    c = this.charAt(i);
                 }
                 do {
                     i += 1;

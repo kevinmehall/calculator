@@ -50,8 +50,16 @@ class UnitValue extends CalcConstant
 			units.append(i[1].name)
 			if i[0] != 1
 				units.append($('<sup></sup>').text(i[0]))
-		
-		$("<span class='value'></span>").text(@value).append(units)
+				
+		v = Math.abs(@value)
+		if v >= 1e5 or v <= 1e-4
+			p = Math.floor(Math.log(v)/Math.LN10)
+			v = Math.round(1e8 * v/Math.pow(10, p)) / 1e8
+			s = (if @value < 0 then '-' else '')
+			v = $("<span class='value'>#{s}#{v} &times; 10<sup>#{p}</sup><span>")
+		else
+			v = $("<span class='value'></span>").text(@value)
+		v.append(units)
 		
 	numUnits: -> @units.length
 		
@@ -102,7 +110,7 @@ class UnitValue extends CalcConstant
 		
 	subtract: (other) ->
 		[a,b] = @matchUnits(other)
-		new UnitValue(a.value+b.value, b.units)
+		new UnitValue(a.value-b.value, b.units)
 		
 	pow: (other) ->
 		if not other.isUnitless()
@@ -130,16 +138,22 @@ class Unit extends UnitValue
 		if not @name
 			@nam e= name
 
-exports.number = number = (c) -> new UnitValue(c, [])
+exports.number = number = (c, u) -> new UnitValue(c, u||[])
 
 
 $ ->
 	u = exports.unitscope = {}
-	u.m = u.meters = u.meter = new Unit(null, 'meters')
-	u.s = u.seconds = u.second = new Unit(null, 'seconds')
-	u.kg = u.kilograms = u.kilograms = new Unit(null, 'kilograms')
-	u.N = u.newtons = u.newton = new Unit(u.kg.multiply(u.m.divide(u.s.powJS(2))), 'N')
-	u.J = u.joules = u.joule = new Unit(u.N.multiply(u.m), 'J')
+	u.m = u.meters = u.meter = new Unit(null, 'meter')
+	u.s = u.seconds = u.second = new Unit(null, 'second')
+	u.kg = u.kilograms = u.kilograms = new Unit(null, 'kilogram')
+	u.N = u.newtons = u.newton = new Unit(u.kg.multiply(u.m.divide(u.s.powJS(2))), 'Newton')
+	u.J = u.joules = u.joule = new Unit(u.N.multiply(u.m), 'Joule')
+	u.C = u.couloumbs = u.coulomb = new Unit(null, 'Coulomb')
+	
+	u.PI = u.pi = number(Math.PI, [])
+	u.E = number(Math.PI, [])
+	u.qe = number(1.6e-19, [[u.C, 1]])
+	u.e0 = number(8.854187817e-12, [[u.C, 2], [u.kg, -1], [u.m, -3], [u.s, 2]])
 
 
 
