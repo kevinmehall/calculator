@@ -7,7 +7,6 @@ class CalcReactive extends CalcObject
 	constructor: ->
 		super
 		@listeners = []
-		@cache = false
 		@invalidated = false
 	
 	addListener: (l) ->
@@ -18,16 +17,14 @@ class CalcReactive extends CalcObject
 		if i != -1
 			@listeners.splice(i, 1)
 		
-	invalidateCache: ->
-		@cache = false
+	invalidate: ->
 		if not @invalidated
 			@invalidated = true
-			listener.invalidateCache() for listener in @listeners
+			listener.invalidate() for listener in @listeners
 			
 	setValid: ->
 		@invalidated = false
 		
-	get: -> @cache
 
 class CalcConstant extends CalcObject
 	type: 'constant'
@@ -56,12 +53,12 @@ class CalcExpression extends CalcReactive
 	type: 'expression'
 			
 	get: ->
-		@setValid()
-		if not @cache
-			@cache = recursiveDepError # so it fails if accessed by evaluate()
-			@cache = @evaluate()
-		return super()
-		
+		return recursiveDepError if @inside
+	
+		@inside = true
+		v = @evaluate()
+		@inside = false
+		return v
 	
 fnToExpressionClass = (fn) ->
 	(args) ->
@@ -161,7 +158,7 @@ class CalcVarExpression extends CalcReactive
 			@value.removeListener()
 		@value = value
 		@value.addListener(this)
-		@invalidateCache()
+		@invalidate()
 		
 		
 		

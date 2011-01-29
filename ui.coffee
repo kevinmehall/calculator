@@ -77,7 +77,7 @@ class CalcViewRow
 			@changeName('r1')
 		@var.set(compileExpression(exp, @parent))
 		
-	invalidateCache: ->
+	invalidate: ->
 		setTimeout(@update, 10)
 
 class CalcView extends Context
