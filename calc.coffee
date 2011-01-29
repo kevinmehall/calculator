@@ -1,7 +1,12 @@
 exports = window
 
+id = 0
+
 class CalcObject
-		setName: (@name) ->
+	constructor: ->
+		@id = id++
+		
+	setName: (@name) ->
 
 class CalcReactive extends CalcObject
 	constructor: ->
@@ -19,11 +24,9 @@ class CalcReactive extends CalcObject
 		
 	invalidate: ->
 		if not @invalidated
-			@invalidated = true
+			@invalidating = true
 			listener.invalidate() for listener in @listeners
-			
-	setValid: ->
-		@invalidated = false
+			@invalidating = false
 		
 
 class CalcConstant extends CalcObject
@@ -52,11 +55,11 @@ recursiveDepError = new CalcError("Recursive dependency")
 class CalcExpression extends CalcReactive
 	type: 'expression'
 			
-	get: ->
+	get: (bindings) ->
 		return recursiveDepError if @inside
 	
 		@inside = true
-		v = @evaluate()
+		v = @evaluate(bindings).get(bindings)
 		@inside = false
 		return v
 	
@@ -68,10 +71,10 @@ fnToExpressionClass = (fn) ->
 		for i in args
 			i.addListener(cl)
 	 	
-		cl.evaluate = ->
+		cl.evaluate = (bindings) ->
 			evaluatedArgs = []
 			for a in @args
-				v = a.get()
+				v = a.get(bindings)
 				if v.type == 'error'
 					if v.name
 						return new CalcError("Previous error from '#{a.name}'")
@@ -102,6 +105,7 @@ FNS = {
 	sqrt: fnToExpressionClass (x) -> x.sqrt()
 	ln: fnToExpressionClass (x) -> x.ln()
 	unit: fnToExpressionClass (x) -> new Unit(x)
+	arg: fnToExpressionClass (x) -> new CalcArg()
 }
 
 
@@ -142,15 +146,13 @@ class CalcVarExpression extends CalcReactive
 		@set(value) if value
 		@inside = false
 		
-	get: ->
-		@setValid()
+	get: (bindings) ->
 		return recursiveDepError if @inside
 	
 		@inside = true
-		v = @value.get()
+		v = @value.get(bindings.withName(@name))
 		@inside = false
 		
-		v.setName(@name)
 		return v
 		
 	set: (value) ->
@@ -160,7 +162,37 @@ class CalcVarExpression extends CalcReactive
 		@value.addListener(this)
 		@invalidate()
 		
+class CalcArg extends CalcReactive
+	type: 'arg'
+	constructor: (@name) ->
+		super
 		
+	get: (bindings) -> 
+		@name ||= bindings.name
+		
+		v = bindings.args[@id]
+		if v
+			v.get(bindings)	
+		else
+			new UnboundArgError(this)
+			
+class UnboundArgError extends CalcError
+	display: -> $("<span style='color:green'></span>").text("Function of #{@error.name}") 
+	
+class Bindings
+	constructor: (@args, @name) ->
+		
+	extend: (arg, val) ->
+		F = -> 
+		F.prototype = @args
+		v = new F()
+		v[@arg.id] = val
+		return new Bindings(v, @name)
+		
+	withName: (name) ->
+		return new Bindings(@args, name)
+		
+rootbinding = new Bindings({}, 'TopLevel')
 		
 exports.Context = class Context
 	constructor: (@scopes)->

@@ -63,7 +63,7 @@ class CalcViewRow
 			@changeExp(@inp_val.val())
 
 	update: =>
-		$(@td_ans).empty().append(@var.get().display())
+		$(@td_ans).empty().append(@var.get(rootbinding).display())
 
 	changeName: (name) ->
 		if not name or name is @var.name then return

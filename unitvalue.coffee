@@ -128,15 +128,18 @@ class UnitValue extends CalcConstant
 		new UnitValue(fn(@value), @units)
 		
 class Unit extends UnitValue
-	constructor: (definition, name) ->
+	constructor: (definition, @name) ->
 		@value = 1
 		@definition = definition.toBaseUnits() if definition
-		@name = name ? 'UnnamedUnit'
 		@units = [[this,1]]
 		
+	get: (bindings) ->
+		@name ||= bindings.name
+		super
+	 
 	setName: (name) ->
 		if not @name
-			@nam e= name
+			@name = name
 
 exports.number = number = (c, u) -> new UnitValue(c, u||[])
 
