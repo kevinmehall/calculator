@@ -63,31 +63,36 @@ class CalcExpression extends CalcReactive
 		@inside = false
 		return v
 	
-fnToExpressionClass = (fn) ->
+macroClass = (fn) ->
 	(args) ->
 		cl = new CalcExpression()
-		cl.args = args
 		
 		for i in args
 			i.addListener(cl)
-	 	
+			
 		cl.evaluate = (bindings) ->
-			evaluatedArgs = []
-			for a in @args
-				v = a.get(bindings)
-				if v.type == 'error'
-					if v.name
-						return new CalcError("Previous error from '#{a.name}'")
-					else
-						return v
-				evaluatedArgs.push(v)
 			try
-				fn.apply(this, evaluatedArgs)
+				fn.apply(bindings, args)
 			catch e
 				return new CalcError(e.message ? e)
-		
 		return cl
 
+fnToExpressionClass = (fn) ->			
+	macroClass ->
+		args = Array.prototype.slice.apply(arguments)
+		
+		evaluatedArgs = []
+	
+		for a in args
+			v = a.get(this)
+			if v.type == 'error'
+				if v.name
+					return new CalcError("Previous error from '#{a.name}'")
+				else
+					return v
+			evaluatedArgs.push(v)
+	
+		fn.apply(this, evaluatedArgs)
 		
 OPS = 
 	'*': fnToExpressionClass((a, b) -> a.multiply(b))
@@ -106,6 +111,7 @@ FNS = {
 	ln: fnToExpressionClass (x) -> x.ln()
 	unit: fnToExpressionClass (x) -> new Unit(x)
 	arg: fnToExpressionClass (x) -> new CalcArg()
+	with: macroClass (arg, val, exp) -> exp.get(this.extend(arg, val))
 }
 
 
