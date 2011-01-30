@@ -34,7 +34,8 @@ function make_parse(){
 	    }
 	    return s;
 	};
-
+	
+	symbol(",");
 	symbol("(end)");
 	
 	
@@ -136,6 +137,7 @@ function make_parse(){
 			while (true){
 				left.args.push(expression(0));
 				if (token.id !== ',') break;
+				advance(',');
 			}
 		}
 	    advance(")");
@@ -150,7 +152,7 @@ function make_parse(){
 	}
 	
     return function (source) {
-        tokens = source.tokens('=<>/+-*%^()');
+        tokens = source.tokens('=<>/+-*%^(),');
         token_nr = 0;
         advance();
         var s = expression(0);

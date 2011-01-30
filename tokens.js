@@ -56,7 +56,7 @@ String.prototype.tokens = function (spliton) {
     }
 
     if (typeof spliton !== 'string') {
-        spliton = '/+-*';
+        spliton = '/+-*,';
     }
 
 

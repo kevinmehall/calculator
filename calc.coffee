@@ -23,7 +23,7 @@ class CalcReactive extends CalcObject
 			@listeners.splice(i, 1)
 		
 	invalidate: ->
-		if not @invalidated
+		if not @invalidating
 			@invalidating = true
 			listener.invalidate() for listener in @listeners
 			@invalidating = false
@@ -90,6 +90,9 @@ fnToExpressionClass = (fn) ->
 					return new CalcError("Previous error from '#{a.name}'")
 				else
 					return v
+			else if v.type == 'arg'
+				return new UnboundArgError(v)
+				
 			evaluatedArgs.push(v)
 	
 		fn.apply(this, evaluatedArgs)
@@ -111,7 +114,8 @@ FNS = {
 	ln: fnToExpressionClass (x) -> x.ln()
 	unit: fnToExpressionClass (x) -> new Unit(x)
 	arg: fnToExpressionClass (x) -> new CalcArg()
-	with: macroClass (arg, val, exp) -> exp.get(this.extend(arg, val))
+	with: macroClass (arg, val, exp) -> 
+		exp.get(this.extend(arg.get(this), val))
 }
 
 
@@ -176,11 +180,15 @@ class CalcArg extends CalcReactive
 	get: (bindings) -> 
 		@name ||= bindings.name
 		
+		console.log 'arg get', bindings.args
+		
 		v = bindings.args[@id]
 		if v
 			v.get(bindings)	
 		else
-			new UnboundArgError(this)
+			this
+			
+	display: -> $("<span style='color:green'></span>").text("Argument #{@name}") 
 			
 class UnboundArgError extends CalcError
 	display: -> $("<span style='color:green'></span>").text("Function of #{@error.name}") 
@@ -192,7 +200,7 @@ class Bindings
 		F = -> 
 		F.prototype = @args
 		v = new F()
-		v[@arg.id] = val
+		v[arg.id] = val
 		return new Bindings(v, @name)
 		
 	withName: (name) ->
