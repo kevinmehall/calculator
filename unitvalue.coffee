@@ -130,8 +130,13 @@ class UnitValue extends CalcConstant
 class Unit extends UnitValue
 	constructor: (definition, @name) ->
 		@value = 1
-		@definition = definition.toBaseUnits() if definition
+		@definitionObj = definition
+		@definition = definition.get(rootbinding).toBaseUnits() if definition
 		@units = [[this,1]]
+		
+	invalidate: ->
+		@definition = @definitionObj.get(rootbinding).toBaseUnits() if definition
+		super
 		
 	get: (bindings) ->
 		@name ||= bindings.name

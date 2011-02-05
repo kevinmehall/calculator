@@ -97,6 +97,15 @@ fnToExpressionClass = (fn) ->
 	
 		fn.apply(this, evaluatedArgs)
 		
+constructor = (fn) ->
+	(args) ->
+		obj = fn.apply(this, args)
+		
+		for i in args
+			i.addListener(obj)
+			
+		return obj
+		
 OPS = 
 	'*': fnToExpressionClass((a, b) -> a.multiply(b))
 	'/': fnToExpressionClass((a, b) -> a.divide(b))
@@ -112,8 +121,8 @@ FNS = {
 	abs: fnToExpressionClass (x) -> x.wrap(Math.abs)
 	sqrt: fnToExpressionClass (x) -> x.sqrt()
 	ln: fnToExpressionClass (x) -> x.ln()
-	unit: (x) -> new Unit(x)
-	arg: () -> new CalcArg()
+	unit: constructor (x) -> new Unit(x)
+	arg: constructor () -> new CalcArg()
 	let: macroClass (arg, val, exp) -> exp.get(this.extend(arg.get(this), val))
 }
 
@@ -178,8 +187,6 @@ class CalcArg extends CalcReactive
 		
 	get: (bindings) -> 
 		@name ||= bindings.name
-		
-		console.log 'arg get', bindings.args
 		
 		v = bindings.args[@id]
 		if v
