@@ -71,9 +71,11 @@ macroClass = (fn) ->
 			i.addListener(cl)
 			
 		cl.evaluate = (bindings) ->
+			console.log('eval macro')
 			try
 				fn.apply(bindings, args)
 			catch e
+				console.error(e, e.stack)
 				return new CalcError(e.message ? e)
 		return cl
 
@@ -124,6 +126,8 @@ FNS = {
 	unit: constructor (x) -> new Unit(x)
 	arg: constructor () -> new CalcArg()
 	let: macroClass (arg, val, exp) -> exp.get(this.extend(arg.get(this), val))
+	linspace: constructor (lolimit, hilimit) -> new Linspace(lolimit, hilimit)
+	plot: macroClass (x,y) -> plot(this, x,y)
 }
 
 
@@ -182,7 +186,7 @@ class CalcVarExpression extends CalcReactive
 		
 class CalcArg extends CalcReactive
 	type: 'arg'
-	constructor: (@name) ->
+	constructor: () ->
 		super
 		
 	get: (bindings) -> 
@@ -198,6 +202,14 @@ class CalcArg extends CalcReactive
 			
 class UnboundArgError extends CalcError
 	display: -> $("<span style='color:green'></span>").text("Function of #{@error.name}") 
+	
+class Linspace extends CalcArg
+	constructor: (@lolimit, @hilimit) -> 
+		super
+		
+getNumber = (v, bindings) ->
+	v.get(bindings).value ? NaN
+	
 	
 class Bindings
 	constructor: (@args, @name) ->
