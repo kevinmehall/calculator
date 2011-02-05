@@ -27,7 +27,8 @@ plot = (bindings, xvar, yvar) ->
 		
 		console.log(xlo, xhi)
 		
-		data = pv.range(xlo, xhi, (xhi-xlo)/h).map (x) ->
+		step = (xhi-xlo)/h
+		data = pv.range(xlo, xhi + step, step).map (x) ->
 			b = bindings.extend(xsp, number(x))
 			{x: getNumber(xvar, b), y: getNumber(yvar, b)} #TODO: units
 		
