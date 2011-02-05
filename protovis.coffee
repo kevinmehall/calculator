@@ -25,11 +25,12 @@ plot = (bindings, xvar, yvar) ->
 			{x: x, y:getNumber(yvar, bindings.extend(xsp, number(x)))} #TODO: units
 		
 		ymax = pv.max(data, (d)->d.y)
+		ymin = pv.min(data, (d)->d.y)
 			
 		console.log(data)
 		
 		x = pv.Scale.linear(xlo, xhi).range(0, w)
-		y = pv.Scale.linear(0, ymax).nice().range(0, h)
+		y = pv.Scale.linear(ymin, ymax).nice().range(0, h)
 	
 		vis = new pv.Panel()
 			.width(w + 5)
