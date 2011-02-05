@@ -112,10 +112,9 @@ FNS = {
 	abs: fnToExpressionClass (x) -> x.wrap(Math.abs)
 	sqrt: fnToExpressionClass (x) -> x.sqrt()
 	ln: fnToExpressionClass (x) -> x.ln()
-	unit: fnToExpressionClass (x) -> new Unit(x)
-	arg: fnToExpressionClass (x) -> new CalcArg()
-	with: macroClass (arg, val, exp) -> 
-		exp.get(this.extend(arg.get(this), val))
+	unit: (x) -> new Unit(x)
+	arg: () -> new CalcArg()
+	let: macroClass (arg, val, exp) -> exp.get(this.extend(arg.get(this), val))
 }
 
 
@@ -132,7 +131,7 @@ compileExpression = (exp, context) ->
 			when 'function'
 				if FNS[v.value]
 					a = (expression(i, context) for i in v.args)
-					new FNS[v.value](a)
+					FNS[v.value](a)
 				else
 					new CalcError("Undefined function '#{v.value}'")
 			else
