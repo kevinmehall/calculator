@@ -201,6 +201,7 @@ class CalcArg extends CalcReactive
 	display: -> $("<span style='color:green'></span>").text("Argument #{@name}") 
 			
 class UnboundArgError extends CalcError
+	constructor: (@arg) -> super
 	display: -> $("<span style='color:green'></span>").text("Function of #{@error.name}") 
 	
 class Linspace extends CalcArg

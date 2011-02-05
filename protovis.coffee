@@ -12,6 +12,13 @@ class GraphContainer extends CalcConstant
 
 plot = (bindings, xvar, yvar) -> 
 		xsp = xvar.get(bindings)
+		if xsp.constructor == UnboundArgError
+			xsp = xsp.arg
+			
+		if xsp.constructor != Linspace
+			return new CalcError("x must be a function of a Linspace")
+		
+		
 		xlo = getNumber(xsp.lolimit, bindings)
 		xhi = getNumber(xsp.hilimit, bindings) 
 	
@@ -21,15 +28,18 @@ plot = (bindings, xvar, yvar) ->
 		console.log(xlo, xhi)
 		
 		data = pv.range(xlo, xhi, (xhi-xlo)/h).map (x) ->
-			console.log(yvar.get(bindings.extend(xsp,number(x))))
-			{x: x, y:getNumber(yvar, bindings.extend(xsp, number(x)))} #TODO: units
+			b = bindings.extend(xsp, number(x))
+			{x: getNumber(xvar, b), y: getNumber(yvar, b)} #TODO: units
 		
+		
+		xmax = pv.max(data, (d)->d.x)
+		xmin = pv.min(data, (d)->d.x)
 		ymax = pv.max(data, (d)->d.y)
 		ymin = pv.min(data, (d)->d.y)
 			
 		console.log(data)
 		
-		x = pv.Scale.linear(xlo, xhi).range(0, w)
+		x = pv.Scale.linear(xmin, xmax).nice().range(0, w)
 		y = pv.Scale.linear(ymin, ymax).nice().range(0, h)
 	
 		vis = new pv.Panel()
