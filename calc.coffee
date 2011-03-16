@@ -107,6 +107,34 @@ constructor = (fn) ->
 			i.addListener(obj)
 			
 		return obj
+
+
+integrate = (range, integrand) ->
+	r = range.get(this)
+	
+	if r.constructor != Linspace
+		return new CalcError("Integral limits must be linspace")
+
+	l1 = getNumber(r.lolimit, this)
+	l2 = getNumber(r.hilimit, this)
+	steps = 50
+	
+	dt = (l2 - l1)/steps
+	result = 0
+	
+	prev = getNumber(integrand, this.extend(r, r.lolimit))
+	i = l1
+	
+	while i <= l2
+		i += dt
+		h =  getNumber(integrand, this.extend(r, number(i)))
+		result += dt * (prev + h)/2
+		prev = h
+		
+		
+	return number(result)
+	
+	
 		
 OPS = 
 	'*': fnToExpressionClass((a, b) -> a.multiply(b))
@@ -128,6 +156,7 @@ FNS = {
 	let: macroClass (arg, val, exp) -> exp.get(this.extend(arg.get(this), val))
 	linspace: constructor (lolimit, hilimit) -> new Linspace(lolimit, hilimit)
 	plot: macroClass (x,y) -> plot(this, x,y)
+	integrate: macroClass integrate
 }
 
 
