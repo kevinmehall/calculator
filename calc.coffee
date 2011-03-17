@@ -71,7 +71,6 @@ macroClass = (fn) ->
 			i.addListener(cl)
 			
 		cl.evaluate = (bindings) ->
-			console.log('eval macro')
 			try
 				fn.apply(bindings, args)
 			catch e
@@ -134,6 +133,37 @@ integrate = (range, integrand) ->
 		
 	return number(result)
 	
+cintegrate = (range, integrand) ->
+	r = range.value #TODO: only works when range is in a var
+	
+	l1 = getNumber(r.lolimit, this)
+	console.log(r.value)
+	l2 = getNumber(r, this) 
+	if isNaN(l2)
+		return new UnboundArgError(r)
+		
+	console.log("cintegrate on limits", l1, l2)
+	
+	if l1 == l2
+		return number(0)
+	
+	steps = 30
+	
+	dt = (l2 - l1)/steps
+	result = 0
+	
+	prev = getNumber(integrand, this.extend(r, r.lolimit))
+	i = l1
+	
+	while i <= l2
+		i += dt
+		h =  getNumber(integrand, this.extend(r, number(i)))
+		result += dt * (prev + h)/2
+		prev = h
+		
+		
+	return number(result)
+	
 	
 		
 OPS = 
@@ -157,6 +187,7 @@ FNS = {
 	linspace: constructor (lolimit, hilimit) -> new Linspace(lolimit, hilimit)
 	plot: macroClass (x,y) -> plot(this, x,y)
 	integrate: macroClass integrate
+	cintegrate: macroClass cintegrate
 }
 
 

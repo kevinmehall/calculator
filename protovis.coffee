@@ -27,7 +27,7 @@ plot = (bindings, xvar, yvar) ->
 		
 		console.log(xlo, xhi)
 		
-		step = (xhi-xlo)/h
+		step = 10*(xhi-xlo)/h
 		data = pv.range(xlo, xhi + step, step).map (x) ->
 			b = bindings.extend(xsp, number(x))
 			{x: getNumber(xvar, b), y: getNumber(yvar, b)} #TODO: units
@@ -37,8 +37,6 @@ plot = (bindings, xvar, yvar) ->
 		xmin = pv.min(data, (d)->d.x)
 		ymax = pv.max(data, (d)->d.y)
 		ymin = pv.min(data, (d)->d.y)
-			
-		console.log(data)
 		
 		x = pv.Scale.linear(xmin, xmax).nice().range(0, w)
 		y = pv.Scale.linear(ymin, ymax).nice().range(0, h)
